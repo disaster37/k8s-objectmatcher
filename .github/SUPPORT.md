@@ -2,7 +2,7 @@
 
 If you are looking for support for the K8S-objectmatcher , here are a few options:
 
-- [GitHub](https://github.com/banzaicloud/k8s-objectmatcher/issues)
+- [GitHub](https://github.com/disaster37/k8s-objectmatcher/issues)
 - [Slack](https://slack.banzaicloud.io/)
 
 You can also open a support ticket from within the Pipeline platform:
