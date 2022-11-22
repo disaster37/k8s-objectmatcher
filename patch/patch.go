@@ -100,19 +100,19 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 				return nil, errors.Wrap(err, "Failed to create patch again to check for an actual diff")
 			}
 
-			switch reflect.ValueOf(current).Kind() {
+			switch reflect.ValueOf(currentObject).Kind() {
 			case reflect.Ptr:
-				patched = reflect.New(reflect.ValueOf(current).Type()).Elem().Interface()
+				patched = reflect.New(reflect.ValueOf(currentObject).Type()).Elem().Interface()
 				if err = json.Unmarshal(patchCurrent, patched); err != nil {
 					return nil, errors.Wrap(err, "Failed to create patched object")
 				}
 			case reflect.Struct:
-				patched = reflect.New(reflect.ValueOf(current).Type()).Interface()
+				patched = reflect.New(reflect.ValueOf(currentObject).Type()).Interface()
 				if err = json.Unmarshal(patchCurrent, patched); err != nil {
 					return nil, errors.Wrap(err, "Failed to create patched object")
 				}
 			default:
-				panic(fmt.Sprintf("empty type: %s", reflect.ValueOf(current).Kind()))
+				panic(fmt.Sprintf("Unknow type: %s", reflect.ValueOf(currentObject).Kind()))
 			}
 		}
 	case *unstructured.Unstructured:
@@ -122,7 +122,7 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 			return nil, errors.Wrap(err, "Failed to generate merge patch")
 		}
 
-		patched = reflect.New(reflect.ValueOf(current).Type()).Elem().Interface()
+		patched = reflect.New(reflect.ValueOf(currentObject).Type()).Elem().Interface()
 		if err = json.Unmarshal(patchCurrent, patched); err != nil {
 			return nil, errors.Wrap(err, "Failed to create patched object")
 		}
