@@ -73,6 +73,22 @@ func IgnoreVolumeClaimTemplateTypeMetaAndStatus() CalculateOption {
 	}
 }
 
+func CleanMetadata() CalculateOption {
+	return func(current, modified []byte) ([]byte, []byte, error) {
+		current, err := cleanMetadata(current)
+		if err != nil {
+			return []byte{}, []byte{}, errors.Wrap(err, "could not clean metadata field from current byte sequence")
+		}
+
+		modified, err = cleanMetadata(modified)
+		if err != nil {
+			return []byte{}, []byte{}, errors.Wrap(err, "could not clean metadata field from modified byte sequence")
+		}
+
+		return current, modified, nil
+	}
+}
+
 func init() {
 	// k8s.io/apimachinery/pkg/util/intstr.IntOrString behaves really badly
 	// from JSON marshaling point of view, it can't be empty basically.
@@ -240,6 +256,30 @@ func deleteVolumeClaimTemplateFields(obj []byte) ([]byte, error) {
 						}
 					}
 				}
+			}
+		}
+	}
+
+	obj, err = json.ConfigCompatibleWithStandardLibrary.Marshal(resource)
+	if err != nil {
+		return []byte{}, errors.Wrap(err, "could not marshal byte sequence")
+	}
+
+	return obj, nil
+}
+
+func cleanMetadata(obj []byte) ([]byte, error) {
+	resource := map[string]any{}
+	err := json.Unmarshal(obj, &resource)
+	if err != nil {
+		return []byte{}, errors.Wrap(err, "could not unmarshal byte sequence")
+	}
+
+	if metadata, ok :=  resource["metadata"]; ok {
+		if metadata, ok := metadata.(map[string]any); ok {
+			resource["metadata"] = map[string]any{
+				"labels": metadata["labels"],
+				"annotations": metadata["annotations"],
 			}
 		}
 	}
