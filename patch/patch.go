@@ -111,6 +111,8 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 				if err = json.Unmarshal(patchCurrent, patched); err != nil {
 					return nil, errors.Wrap(err, "Failed to create patched object")
 				}
+			default:
+				panic(fmt.Sprintf("empty type: %s", reflect.ValueOf(current).Kind()))
 			}
 		}
 	case *unstructured.Unstructured:
