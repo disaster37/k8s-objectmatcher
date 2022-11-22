@@ -16,6 +16,7 @@ package patch
 
 import (
 	"fmt"
+	"reflect"
 
 	"emperror.dev/errors"
 	json "github.com/json-iterator/go"
@@ -79,6 +80,7 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 	}
 
 	var patch []byte
+	var patched any
 
 	switch currentObject.(type) {
 	default:
@@ -97,11 +99,30 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 			if err != nil {
 				return nil, errors.Wrap(err, "Failed to create patch again to check for an actual diff")
 			}
+
+			switch reflect.ValueOf(current).Kind() {
+			case reflect.Ptr:
+				patched = reflect.New(reflect.ValueOf(current).Type()).Elem().Interface()
+				if err = json.Unmarshal(patchCurrent, patched); err != nil {
+					return nil, errors.Wrap(err, "Failed to create patched object")
+				}
+			case reflect.Struct:
+				patched = reflect.New(reflect.ValueOf(current).Type()).Interface()
+				if err = json.Unmarshal(patchCurrent, patched); err != nil {
+					return nil, errors.Wrap(err, "Failed to create patched object")
+				}
+			}
 		}
 	case *unstructured.Unstructured:
-		patch, err = p.unstructuredJsonMergePatch(original, modified, current)
+		var patchCurrent []byte
+		patch, patchCurrent, err = p.unstructuredJsonMergePatch(original, modified, current)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to generate merge patch")
+		}
+
+		patched = reflect.New(reflect.ValueOf(current).Type()).Elem().Interface()
+		if err = json.Unmarshal(patchCurrent, patched); err != nil {
+			return nil, errors.Wrap(err, "Failed to create patched object")
 		}
 	}
 
@@ -110,28 +131,30 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 		Current:  current,
 		Modified: modified,
 		Original: original,
+		Patched:  patched,
 	}, nil
 }
 
-func (p *PatchMaker) unstructuredJsonMergePatch(original, modified, current []byte) ([]byte, error) {
+func (p *PatchMaker) unstructuredJsonMergePatch(original, modified, current []byte) ([]byte, []byte, error) {
 	patch, err := p.jsonMergePatcher.CreateThreeWayJSONMergePatch(original, modified, current)
+	var patchedCurrent []byte
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to generate merge patch")
+		return nil, nil, errors.Wrap(err, "Failed to generate merge patch")
 	}
 	// Apply the patch to the current object and create a merge patch to see if there has any effective changes been made
 	if string(patch) != "{}" {
 		// apply the patch
-		patchedCurrent, err := p.jsonMergePatcher.MergePatch(current, patch)
+		patchedCurrent, err = p.jsonMergePatcher.MergePatch(current, patch)
 		if err != nil {
-			return nil, errors.Wrap(err, "Failed to merge generated patch to current object")
+			return nil, nil, errors.Wrap(err, "Failed to merge generated patch to current object")
 		}
 		// create the patch again, but now between the current and the patched version of the current object
 		patch, err = p.jsonMergePatcher.CreateMergePatch(current, patchedCurrent)
 		if err != nil {
-			return nil, errors.Wrap(err, "Failed to create patch between the current and patched current object")
+			return nil, nil, errors.Wrap(err, "Failed to create patch between the current and patched current object")
 		}
 	}
-	return patch, err
+	return patch, patchedCurrent, err
 }
 
 type PatchResult struct {
@@ -139,6 +162,7 @@ type PatchResult struct {
 	Current  []byte
 	Modified []byte
 	Original []byte
+	Patched  any
 }
 
 func (p *PatchResult) IsEmpty() bool {

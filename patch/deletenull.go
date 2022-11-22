@@ -277,6 +277,11 @@ func cleanMetadata(obj []byte) ([]byte, error) {
 
 	if metadata, ok :=  resource["metadata"]; ok {
 		if metadata, ok := metadata.(map[string]any); ok {
+			if annotations, ok := metadata["annotations"]; ok {
+				if annotations, ok := annotations.(map[string]string); ok {
+					delete(annotations, "kubectl.kubernetes.io/last-applied-configuration")
+				}
+			}
 			resource["metadata"] = map[string]any{
 				"labels": metadata["labels"],
 				"annotations": metadata["annotations"],

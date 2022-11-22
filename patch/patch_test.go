@@ -31,6 +31,7 @@ func Test_unstructuredJsonMergePatch(t *testing.T) {
 		name      string
 		args      args
 		wantPatch map[string]interface{}
+		wantPatched map[string]interface{}
 		wantErr   bool
 	}{
 		{
@@ -43,6 +44,7 @@ func Test_unstructuredJsonMergePatch(t *testing.T) {
 				current:  map[string]interface{}{},
 			},
 			wantPatch: map[string]interface{}{},
+			wantPatched: map[string]interface{}{},
 			wantErr:   false,
 		},
 		{
@@ -59,6 +61,7 @@ func Test_unstructuredJsonMergePatch(t *testing.T) {
 			wantPatch: map[string]interface{}{
 				"a": nil,
 			},
+			wantPatched: map[string]interface{}{},
 			wantErr: false,
 		},
 		{
@@ -74,6 +77,9 @@ func Test_unstructuredJsonMergePatch(t *testing.T) {
 			wantPatch: map[string]interface{}{
 				"a": "new",
 			},
+			wantPatched: map[string]interface{}{
+				"a": "new",
+			},
 			wantErr: false,
 		},
 		{
@@ -87,12 +93,15 @@ func Test_unstructuredJsonMergePatch(t *testing.T) {
 			wantPatch: map[string]interface{}{
 				"a": "b",
 			},
+			wantPatched: map[string]interface{}{
+				"a": "b",
+			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DefaultPatchMaker.(*PatchMaker).unstructuredJsonMergePatch(
+			got, patched, err := DefaultPatchMaker.(*PatchMaker).unstructuredJsonMergePatch(
 				mustFromUnstructured(tt.args.original),
 				mustFromUnstructured(tt.args.modified),
 				mustFromUnstructured(tt.args.current))
@@ -102,6 +111,9 @@ func Test_unstructuredJsonMergePatch(t *testing.T) {
 			}
 			if !reflect.DeepEqual(mustToUnstructured(got), tt.wantPatch) {
 				t.Errorf("unstructuredJsonMergePatch() got = %v, want %v", mustToUnstructured(got), tt.wantPatch)
+			}
+			if !reflect.DeepEqual(mustToUnstructured(patched), tt.wantPatched) {
+				t.Errorf("unstructuredJsonMergePatch() got = %v, want %v", mustToUnstructured(patched), tt.wantPatched)
 			}
 		})
 	}
