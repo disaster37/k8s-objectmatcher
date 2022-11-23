@@ -128,7 +128,7 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 		default:
 			panic(fmt.Sprintf("Unknow type: %s", reflect.ValueOf(currentObject).Kind()))
 		}
-		if err := DefaultAnnotator.SetLastAppliedAnnotation(patched.(runtime.Object)); err != nil {
+		if err := DefaultAnnotator.SetLastAppliedAnnotationToObject(patched.(runtime.Object), modifiedObject); err != nil {
 			return nil, errors.Wrap(err, "Failed to annotate patched object")
 		}
 	case *unstructured.Unstructured:
@@ -143,7 +143,7 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 			return nil, errors.Wrap(err, "Failed to create patched object")
 		}
 
-		if err := DefaultAnnotator.SetLastAppliedAnnotation(patched.(runtime.Object)); err != nil {
+		if err := DefaultAnnotator.SetLastAppliedAnnotationToObject(patched.(runtime.Object), modifiedObject); err != nil {
 			return nil, errors.Wrap(err, "Failed to annotate patched object")
 		}
 	}

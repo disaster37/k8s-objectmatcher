@@ -169,6 +169,21 @@ func (a *Annotator) SetLastAppliedAnnotation(obj runtime.Object) error {
 	return a.SetOriginalConfiguration(obj, modifiedWithoutNulls)
 }
 
+// SetLastAppliedAnnotation gets the modified configuration of the object,
+// without embedding it again, and then sets it on the object as the annotation.
+func (a *Annotator) SetLastAppliedAnnotationToObject(objModified runtime.Object, objExpected runtime.Object) error {
+	modified, err := a.GetModifiedConfiguration(objExpected, false)
+	if err != nil {
+		return err
+	}
+	// Remove nulls from json
+	modifiedWithoutNulls, _, err := DeleteNullInJson(modified)
+	if err != nil {
+		return err
+	}
+	return a.SetOriginalConfiguration(objModified, modifiedWithoutNulls)
+}
+
 func zipAndBase64EncodeAnnotation(original []byte) (string, error) {
 	// Create a buffer to write our archive to.
 	buf := new(bytes.Buffer)
