@@ -54,12 +54,19 @@ func TestCalculate(t *testing.T) {
 			args: args{
 				modified: &corev1.Service{
 					ObjectMeta: v1.ObjectMeta{
+						Name: "my-service",
+						Namespace: "default",
 						Labels: map[string]string{
 							"foo": "bar",
 						},
 					},
 				},
-				current: &corev1.Service{},
+				current: &corev1.Service{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "my-service",
+							Namespace: "default",
+						},
+				},
 			},
 			wantPatch: map[string]any{
 				"metadata": map[string]any {
@@ -70,6 +77,8 @@ func TestCalculate(t *testing.T) {
 			},
 			wantPatched: &corev1.Service{
 				ObjectMeta: v1.ObjectMeta{
+					Name: "my-service",
+					Namespace: "default",
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -80,9 +89,16 @@ func TestCalculate(t *testing.T) {
 		{
 			name: "remove labels",
 			args: args{
-				modified: &corev1.Service{},
+				modified: &corev1.Service{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "my-service",
+						Namespace: "default",
+					},
+				},
 				current: &corev1.Service{
 					ObjectMeta: v1.ObjectMeta{
+						Name: "my-service",
+						Namespace: "default",
 						Labels: map[string]string{
 							"foo": "bar",
 						},
@@ -90,10 +106,14 @@ func TestCalculate(t *testing.T) {
 				},
 			},
 			wantPatch: map[string]any{
-				"metadata": nil,
+				"metadata": map[string]any {
+					"labels": nil,
+				},
 			},
 			wantPatched: &corev1.Service{
 				ObjectMeta: v1.ObjectMeta{
+					Name: "my-service",
+					Namespace: "default",
 				},
 			},
 			wantErr: false,
@@ -104,7 +124,9 @@ func TestCalculate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			patch, err := DefaultPatchMaker.(*PatchMaker).Calculate(
 				mustAnnotate(tt.args.current),
-				tt.args.modified)
+				tt.args.modified,
+				CleanMetadata(),
+			)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Calculate() error = %v, wantErr %v", err, tt.wantErr)
 				return

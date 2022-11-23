@@ -20,7 +20,6 @@ import (
 
 	"emperror.dev/errors"
 	json "github.com/json-iterator/go"
-	jsonK8s "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -53,12 +52,8 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to convert current object to byte sequence")
 	}
-
-	// Keep current original to apply patch on it
-	currentOrg, err := jsonK8s.Marshal(currentObject)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to convert current object to byte sequence")
-	}
+	currentOrg := make([]byte, len(current))
+	copy(currentOrg, current)
 
 	modified, err := json.ConfigCompatibleWithStandardLibrary.Marshal(modifiedObject)
 	if err != nil {
@@ -89,35 +84,13 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 
 	var patch []byte
 	var patched any
+	var patchedCurrent []byte
 
 	switch currentObject.(type) {
 	default:
 		patch, err = p.strategicMergePatcher.CreateThreeWayMergePatch(original, modified, current, currentObject)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to generate strategic merge patch")
-		}
-
-		patchCurrent, err := p.strategicMergePatcher.StrategicMergePatch(currentOrg, patch, currentObject)
-		if err != nil {
-			return nil, errors.Wrap(err, "Failed to apply patch")
-		}
-
-		switch reflect.ValueOf(currentObject).Kind() {
-		case reflect.Ptr:
-			patched = reflect.New(reflect.ValueOf(currentObject).Elem().Type()).Interface()
-			if err = jsonK8s.Unmarshal(patchCurrent, patched); err != nil {
-				return nil, errors.Wrap(err, "Failed to create patched object")
-			}
-		case reflect.Struct:
-			patched = reflect.New(reflect.ValueOf(currentObject).Type()).Interface()
-			if err = jsonK8s.Unmarshal(patchCurrent, patched); err != nil {
-				return nil, errors.Wrap(err, "Failed to create patched object")
-			}
-		default:
-			panic(fmt.Sprintf("Unknow type: %s", reflect.ValueOf(currentObject).Kind()))
-		}
-		if err := DefaultAnnotator.SetLastAppliedAnnotation(patched.(runtime.Object)); err != nil {
-			return nil, errors.Wrap(err, "Failed to annotate patched object")
 		}
 
 		// $setElementOrder can make it hard to decide whether there is an actual diff or not.
@@ -132,6 +105,31 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 			if err != nil {
 				return nil, errors.Wrap(err, "Failed to create patch again to check for an actual diff")
 			}
+
+			patchedCurrent, err = p.strategicMergePatcher.StrategicMergePatch(currentOrg, patch, currentObject)
+			if err != nil {
+				return nil, errors.Wrap(err, "Failed to apply patch")
+			}
+		} else {
+			patchedCurrent = currentOrg
+		}
+
+		switch reflect.ValueOf(currentObject).Kind() {
+		case reflect.Ptr:
+			patched = reflect.New(reflect.ValueOf(currentObject).Elem().Type()).Interface()
+			if err = json.Unmarshal(patchedCurrent, patched); err != nil {
+				return nil, errors.Wrap(err, "Failed to create patched object")
+			}
+		case reflect.Struct:
+			patched = reflect.New(reflect.ValueOf(currentObject).Type()).Interface()
+			if err = json.Unmarshal(patchedCurrent, patched); err != nil {
+				return nil, errors.Wrap(err, "Failed to create patched object")
+			}
+		default:
+			panic(fmt.Sprintf("Unknow type: %s", reflect.ValueOf(currentObject).Kind()))
+		}
+		if err := DefaultAnnotator.SetLastAppliedAnnotation(patched.(runtime.Object)); err != nil {
+			return nil, errors.Wrap(err, "Failed to annotate patched object")
 		}
 	case *unstructured.Unstructured:
 		var patchCurrent []byte
@@ -166,10 +164,7 @@ func (p *PatchMaker) unstructuredJsonMergePatch(original, modified, current, cur
 		return nil, nil, errors.Wrap(err, "Failed to generate merge patch")
 	}
 
-	patchedCurrent, err := p.jsonMergePatcher.MergePatch(currentOrg, patch)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "Failed to apply patch")
-	}
+	var patchedCurrent []byte
 
 	// Apply the patch to the current object and create a merge patch to see if there has any effective changes been made
 	if string(patch) != "{}" {
@@ -183,6 +178,13 @@ func (p *PatchMaker) unstructuredJsonMergePatch(original, modified, current, cur
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Failed to create patch between the current and patched current object")
 		}
+
+		patchedCurrent, err = p.jsonMergePatcher.MergePatch(currentOrg, patch)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "Failed to apply patch")
+		}
+	} else {
+		patchedCurrent = currentOrg
 	}
 	return patch, patchedCurrent, err
 }
