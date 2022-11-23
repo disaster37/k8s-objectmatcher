@@ -20,6 +20,7 @@ import (
 
 	"emperror.dev/errors"
 	json "github.com/json-iterator/go"
+	jsonK8s "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -54,8 +55,10 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 	}
 
 	// Keep current original to apply patch on it
-	currentOrg := make([]byte, len(current))
-	copy(currentOrg, current)
+	currentOrg, err := jsonK8s.Marshal(currentObject)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to convert current object to byte sequence")
+	}
 
 	modified, err := json.ConfigCompatibleWithStandardLibrary.Marshal(modifiedObject)
 	if err != nil {
@@ -132,7 +135,7 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 		}
 	case *unstructured.Unstructured:
 		var patchCurrent []byte
-		patch, patchCurrent, err = p.unstructuredJsonMergePatch(original, modified, current)
+		patch, patchCurrent, err = p.unstructuredJsonMergePatch(original, modified, current, currentOrg)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to generate merge patch")
 		}
@@ -156,11 +159,7 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 	}, nil
 }
 
-func (p *PatchMaker) unstructuredJsonMergePatch(original, modified, current []byte) ([]byte, []byte, error) {
-	
-	// Keep current original to apply patch on it
-	currentOrg := make([]byte, len(current))
-	copy(currentOrg, current)
+func (p *PatchMaker) unstructuredJsonMergePatch(original, modified, current, currentOrg []byte) ([]byte, []byte, error) {
 	
 	patch, err := p.jsonMergePatcher.CreateThreeWayJSONMergePatch(original, modified, current)
 	if err != nil {

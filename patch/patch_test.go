@@ -202,6 +202,7 @@ func Test_unstructuredJsonMergePatch(t *testing.T) {
 			got, patched, err := DefaultPatchMaker.(*PatchMaker).unstructuredJsonMergePatch(
 				mustFromUnstructured(tt.args.original),
 				mustFromUnstructured(tt.args.modified),
+				mustFromUnstructured(tt.args.current),
 				mustFromUnstructured(tt.args.current))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("unstructuredJsonMergePatch() error = %v, wantErr %v", err, tt.wantErr)
@@ -232,6 +233,7 @@ func mustToUnstructured(data []byte) map[string]interface{} {
 	}
 	return m
 }
+
 
 func mustAnnotate(o runtime.Object) runtime.Object {
 	if err := DefaultAnnotator.SetLastAppliedAnnotation(o); err != nil {
