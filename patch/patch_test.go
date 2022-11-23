@@ -18,8 +18,106 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	json "github.com/json-iterator/go"
+	corev1 "k8s.io/api/core/v1"
+
+	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
+
+func TestCalculate(t *testing.T) {
+	type args struct {
+		modified *corev1.Service
+		current  *corev1.Service
+	}
+	tests := []struct {
+		name      string
+		args      args
+		wantPatch map[string]interface{}
+		wantPatched *corev1.Service
+		wantErr   bool
+	}{
+		{
+			name: "non-existent field not deleted",
+			args: args{
+				modified: &corev1.Service{},
+				current: &corev1.Service{},
+			},
+			wantPatch: map[string]any{},
+			wantPatched: &corev1.Service{},
+			wantErr: false,
+		},
+		{
+			name: "add labels",
+			args: args{
+				modified: &corev1.Service{
+					ObjectMeta: v1.ObjectMeta{
+						Labels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+				current: &corev1.Service{},
+			},
+			wantPatch: map[string]any{
+				"metadata": map[string]any {
+					"labels": map[string]any {
+						"foo": "bar",
+					},
+				},
+			},
+			wantPatched: &corev1.Service{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "remove labels",
+			args: args{
+				modified: &corev1.Service{},
+				current: &corev1.Service{
+					ObjectMeta: v1.ObjectMeta{
+						Labels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			},
+			wantPatch: map[string]any{
+				"metadata": nil,
+			},
+			wantPatched: &corev1.Service{
+				ObjectMeta: v1.ObjectMeta{
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			patch, err := DefaultPatchMaker.(*PatchMaker).Calculate(
+				mustAnnotate(tt.args.current),
+				tt.args.modified)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Calculate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if diff := cmp.Diff(mustToUnstructured(patch.Patch), tt.wantPatch); diff != "" {
+				t.Errorf("Calculate() diff = %s,  got = %v, want %v", diff, mustToUnstructured(patch.Patch), tt.wantPatch)
+			}
+			if diff := cmp.Diff(patch.Patched, mustAnnotate(tt.wantPatched)); diff != "" {
+				t.Errorf("Calculate() diff = %s,  got = %v, want %v", diff,  patch.Patched, mustAnnotate(tt.wantPatched))
+			}
+		})
+	}
+}
 
 func Test_unstructuredJsonMergePatch(t *testing.T) {
 	type args struct {
@@ -133,4 +231,11 @@ func mustToUnstructured(data []byte) map[string]interface{} {
 		panic(err)
 	}
 	return m
+}
+
+func mustAnnotate(o runtime.Object) runtime.Object {
+	if err := DefaultAnnotator.SetLastAppliedAnnotation(o); err != nil {
+		panic(err)
+	}
+	return o
 }

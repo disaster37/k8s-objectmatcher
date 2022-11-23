@@ -5,7 +5,9 @@ go 1.19
 require (
 	emperror.dev/errors v0.8.1
 	github.com/evanphx/json-patch v5.6.0+incompatible
+	github.com/google/go-cmp v0.5.8
 	github.com/json-iterator/go v1.1.12
+	k8s.io/api v0.25.4
 	k8s.io/apimachinery v0.25.4
 )
 

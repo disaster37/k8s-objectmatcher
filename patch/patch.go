@@ -47,6 +47,7 @@ func NewPatchMaker(annotator *Annotator, strategicMergePatcher StrategicMergePat
 }
 
 func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opts ...CalculateOption) (*PatchResult, error) {
+	
 	current, err := json.ConfigCompatibleWithStandardLibrary.Marshal(currentObject)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to convert current object to byte sequence")
@@ -88,31 +89,36 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to generate strategic merge patch")
 		}
+
+		patchCurrent, err := p.strategicMergePatcher.StrategicMergePatch(current, patch, currentObject)
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to apply patch")
+		}
+
+		switch reflect.ValueOf(currentObject).Kind() {
+		case reflect.Ptr:
+			patched = reflect.New(reflect.ValueOf(currentObject).Elem().Type()).Interface()
+			if err = json.Unmarshal(patchCurrent, patched); err != nil {
+				return nil, errors.Wrap(err, "Failed to create patched object")
+			}
+		case reflect.Struct:
+			patched = reflect.New(reflect.ValueOf(currentObject).Type()).Interface()
+			if err = json.Unmarshal(patchCurrent, patched); err != nil {
+				return nil, errors.Wrap(err, "Failed to create patched object")
+			}
+		default:
+			panic(fmt.Sprintf("Unknow type: %s", reflect.ValueOf(currentObject).Kind()))
+		}
+		if err := DefaultAnnotator.SetLastAppliedAnnotation(patched.(runtime.Object)); err != nil {
+			return nil, errors.Wrap(err, "Failed to annotate patched object")
+		}
+
 		// $setElementOrder can make it hard to decide whether there is an actual diff or not.
 		// In cases like that trying to apply the patch locally on current will make it clear.
 		if string(patch) != "{}" {
-			patchCurrent, err := p.strategicMergePatcher.StrategicMergePatch(current, patch, currentObject)
-			if err != nil {
-				return nil, errors.Wrap(err, "Failed to apply patch again to check for an actual diff")
-			}
 			patch, err = p.strategicMergePatcher.CreateTwoWayMergePatch(current, patchCurrent, currentObject)
 			if err != nil {
 				return nil, errors.Wrap(err, "Failed to create patch again to check for an actual diff")
-			}
-
-			switch reflect.ValueOf(currentObject).Kind() {
-			case reflect.Ptr:
-				patched = reflect.New(reflect.ValueOf(currentObject).Elem().Type()).Interface()
-				if err = json.Unmarshal(patchCurrent, patched); err != nil {
-					return nil, errors.Wrap(err, "Failed to create patched object")
-				}
-			case reflect.Struct:
-				patched = reflect.New(reflect.ValueOf(currentObject).Type()).Interface()
-				if err = json.Unmarshal(patchCurrent, patched); err != nil {
-					return nil, errors.Wrap(err, "Failed to create patched object")
-				}
-			default:
-				panic(fmt.Sprintf("Unknow type: %s", reflect.ValueOf(currentObject).Kind()))
 			}
 		}
 	case *unstructured.Unstructured:
