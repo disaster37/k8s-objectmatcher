@@ -48,16 +48,14 @@ func NewPatchMaker(annotator *Annotator, strategicMergePatcher StrategicMergePat
 
 func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opts ...CalculateOption) (*PatchResult, error) {
 
-	// Keep current original to apply patch on it
-	currentOrg, err := json.ConfigCompatibleWithStandardLibrary.Marshal(currentObject)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to convert current object to byte sequence")
-	}
-
 	current, err := json.ConfigCompatibleWithStandardLibrary.Marshal(currentObject)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to convert current object to byte sequence")
 	}
+
+	// Keep current original to apply patch on it
+	currentOrg := make([]byte, len(current))
+	copy(currentOrg, current)
 
 	modified, err := json.ConfigCompatibleWithStandardLibrary.Marshal(modifiedObject)
 	if err != nil {
@@ -143,6 +141,10 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 		if err = json.Unmarshal(patchCurrent, patched); err != nil {
 			return nil, errors.Wrap(err, "Failed to create patched object")
 		}
+
+		if err := DefaultAnnotator.SetLastAppliedAnnotation(patched.(runtime.Object)); err != nil {
+			return nil, errors.Wrap(err, "Failed to annotate patched object")
+		}
 	}
 
 	return &PatchResult{
@@ -155,20 +157,30 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 }
 
 func (p *PatchMaker) unstructuredJsonMergePatch(original, modified, current []byte) ([]byte, []byte, error) {
+	
+	// Keep current original to apply patch on it
+	currentOrg := make([]byte, len(current))
+	copy(currentOrg, current)
+	
 	patch, err := p.jsonMergePatcher.CreateThreeWayJSONMergePatch(original, modified, current)
-	var patchedCurrent []byte
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Failed to generate merge patch")
 	}
+
+	patchedCurrent, err := p.jsonMergePatcher.MergePatch(currentOrg, patch)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "Failed to apply patch")
+	}
+
 	// Apply the patch to the current object and create a merge patch to see if there has any effective changes been made
 	if string(patch) != "{}" {
 		// apply the patch
-		patchedCurrent, err = p.jsonMergePatcher.MergePatch(current, patch)
+		patchCurrent, err := p.jsonMergePatcher.MergePatch(current, patch)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Failed to merge generated patch to current object")
 		}
 		// create the patch again, but now between the current and the patched version of the current object
-		patch, err = p.jsonMergePatcher.CreateMergePatch(current, patchedCurrent)
+		patch, err = p.jsonMergePatcher.CreateMergePatch(current, patchCurrent)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Failed to create patch between the current and patched current object")
 		}
