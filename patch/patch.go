@@ -47,7 +47,13 @@ func NewPatchMaker(annotator *Annotator, strategicMergePatcher StrategicMergePat
 }
 
 func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opts ...CalculateOption) (*PatchResult, error) {
-	
+
+	// Keep current original to apply patch on it
+	currentOrg, err := json.ConfigCompatibleWithStandardLibrary.Marshal(currentObject)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to convert current object to byte sequence")
+	}
+
 	current, err := json.ConfigCompatibleWithStandardLibrary.Marshal(currentObject)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to convert current object to byte sequence")
@@ -90,7 +96,7 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 			return nil, errors.Wrap(err, "Failed to generate strategic merge patch")
 		}
 
-		patchCurrent, err := p.strategicMergePatcher.StrategicMergePatch(current, patch, currentObject)
+		patchCurrent, err := p.strategicMergePatcher.StrategicMergePatch(currentOrg, patch, currentObject)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to apply patch")
 		}
@@ -116,6 +122,11 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 		// $setElementOrder can make it hard to decide whether there is an actual diff or not.
 		// In cases like that trying to apply the patch locally on current will make it clear.
 		if string(patch) != "{}" {
+			patchCurrent, err := p.strategicMergePatcher.StrategicMergePatch(current, patch, currentObject)
+			if err != nil {
+				return nil, errors.Wrap(err, "Failed to apply patch")
+			}
+
 			patch, err = p.strategicMergePatcher.CreateTwoWayMergePatch(current, patchCurrent, currentObject)
 			if err != nil {
 				return nil, errors.Wrap(err, "Failed to create patch again to check for an actual diff")
