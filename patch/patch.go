@@ -105,12 +105,12 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 		switch reflect.ValueOf(currentObject).Kind() {
 		case reflect.Ptr:
 			patched = reflect.New(reflect.ValueOf(currentObject).Elem().Type()).Interface()
-			if err = json.Unmarshal(patchCurrent, patched); err != nil {
+			if err = jsonK8s.Unmarshal(patchCurrent, patched); err != nil {
 				return nil, errors.Wrap(err, "Failed to create patched object")
 			}
 		case reflect.Struct:
 			patched = reflect.New(reflect.ValueOf(currentObject).Type()).Interface()
-			if err = json.Unmarshal(patchCurrent, patched); err != nil {
+			if err = jsonK8s.Unmarshal(patchCurrent, patched); err != nil {
 				return nil, errors.Wrap(err, "Failed to create patched object")
 			}
 		default:
