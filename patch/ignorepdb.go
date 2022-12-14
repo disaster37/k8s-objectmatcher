@@ -15,10 +15,10 @@
 package patch
 
 import (
-	"reflect"
 	"strings"
 
 	"emperror.dev/errors"
+	"github.com/google/go-cmp/cmp"
 	json "github.com/json-iterator/go"
 )
 
@@ -34,7 +34,7 @@ func IgnorePDBSelector() CalculateOption {
 			return []byte{}, []byte{}, errors.Wrap(err, "could not unmarshal byte sequence for modified")
 		}
 
-		if isPDB(currentResource) && isPDB(modifiedResource) && reflect.DeepEqual(getPDBSelector(currentResource), getPDBSelector(modifiedResource)) {
+		if isPDB(currentResource) && isPDB(modifiedResource) && cmp.Diff(getPDBSelector(currentResource), getPDBSelector(modifiedResource)) == "" {
 			var err error
 			current, err = deletePDBSelector(currentResource)
 			if err != nil {
