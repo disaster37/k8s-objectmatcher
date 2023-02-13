@@ -138,7 +138,7 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opt
 			return nil, errors.Wrap(err, "Failed to generate merge patch")
 		}
 
-		patched = reflect.New(reflect.ValueOf(currentObject).Type()).Elem().Interface()
+		patched = reflect.New(reflect.ValueOf(currentObject).Elem().Type()).Interface()
 		if err = json.Unmarshal(patchCurrent, patched); err != nil {
 			return nil, errors.Wrap(err, "Failed to create patched object")
 		}
