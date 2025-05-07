@@ -279,7 +279,7 @@ func cleanMetadata(obj []byte) ([]byte, error) {
 		return []byte{}, errors.Wrap(err, "could not unmarshal byte sequence")
 	}
 
-	if metadata, ok :=  resource["metadata"]; ok {
+	if metadata, ok := resource["metadata"]; ok {
 		if metadata, ok := metadata.(map[string]any); ok {
 			if annotations, ok := metadata["annotations"]; ok {
 				if annotations, ok := annotations.(map[string]string); ok {
@@ -287,9 +287,9 @@ func cleanMetadata(obj []byte) ([]byte, error) {
 				}
 			}
 			resource["metadata"] = map[string]any{
-				"labels": metadata["labels"],
-				"annotations": metadata["annotations"],
-				"fake": "fake",
+				"labels":          metadata["labels"],
+				"annotations":     metadata["annotations"],
+				"ownerReferences": metadata["ownerReferences"],
 			}
 		}
 	}
