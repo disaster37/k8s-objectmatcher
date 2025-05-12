@@ -289,7 +289,6 @@ func cleanMetadata(obj []byte) ([]byte, error) {
 			resource["metadata"] = map[string]any{
 				"labels":          metadata["labels"],
 				"annotations":     metadata["annotations"],
-				"ownerReferences": metadata["ownerReferences"],
 			}
 		}
 	}
