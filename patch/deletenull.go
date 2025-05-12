@@ -287,9 +287,10 @@ func cleanMetadata(obj []byte) ([]byte, error) {
 				}
 			}
 			resource["metadata"] = map[string]any{
-				"labels":      metadata["labels"],
-				"annotations": metadata["annotations"],
-				"fake":        "fake", // Need to put this to avoid to have nil metadata
+				"labels":          metadata["labels"],
+				"annotations":     metadata["annotations"],
+				"ownerReferences": metadata["ownerReferences"],
+				"fake":            "fake", // Need to put this to avoid to have nil metadata
 			}
 		}
 	}
